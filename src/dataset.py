@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import Dataset
 from pathlib import Path
 import numpy as np
+from typing import TypedDict
 
 
 DATA = Path("/home/francisco/trabalho_final_TPI/data")
@@ -21,9 +22,14 @@ CORES = {
 "pupilas": "orange",
 }
 
+class Face(TypedDict):
+  landmarks: np.ndarray
+  caixa: np.ndarray
+  atributos: np.ndarray
+  imagem: Path
 
 class DatasetAnotacoesFaces(Dataset):
-  def __init__(self, annotations, img_dir, transform=None):
+  def __init__(self, annotations=ANNOTATIONS, img_dir=IMAGES, transform=None):
     self.annotations = Path(annotations)
     self.img_dir = Path(img_dir)
     self.transform = transform
@@ -34,11 +40,11 @@ class DatasetAnotacoesFaces(Dataset):
     # self.faces_treino = self.ler_anotacoes("train")
     # self.faces_teste = self.ler_anotacoes("test")
 
-    self.faces = self.ler_anotacoes("train") + self.ler_anotacoes("test")
+    self.faces: list[Face] = (self.ler_anotacoes("train") + self.ler_anotacoes("test"))
 
-  def ler_anotacoes(self, split):
+  def ler_anotacoes(self, split: str) -> list[Face]:
     arquivo = self.annotations / f"list_98pt_rect_attr_{split}.txt"
-    faces = []
+    faces: list[Face] = []
 
     for linha in arquivo.read_text().splitlines():
       campos = linha.split()
@@ -62,18 +68,6 @@ class DatasetAnotacoesFaces(Dataset):
     if imagem is None:
       raise FileNotFoundError(f"Não foi possível ler a imagem: {caminho}")
     return cv2.cvtColor(imagem, cv2.COLOR_BGR2RGB)
-
-  '''
-  def imagem_para_vetor(self, caminho):
-    imagem = self.ler_imagem_rgb(caminho)
-
-    # OpenCV retorna HWC; modelos geralmente esperam tensores CHW numéricos.
-    # No momento não estou convertendo para tensor por padronização, todos os outros valores são
-    # retornados como np.array
-    return np.transpose(imagem, (2, 0, 1)).copy()
-    # imagem = np.transpose(imagem, (2, 0, 1)).copy()
-    # return torch.from_numpy(imagem).to(dtype=torch.float32) / 255.0
-  '''
 
   def matriz_recorte(self, caixa, margem=1.25):
     """
@@ -108,13 +102,13 @@ class DatasetAnotacoesFaces(Dataset):
       raise RuntimeError(f"Index inválido, não foi possível acessar a posição: {idx}")
 
     face = self.faces[int(idx)]
-    face['imagem'], face['landmarks'] = self.recortar(face)
+    imagem, landmarks = self.recortar(face)
 
     sample = {
-      "landmarks": face["landmarks"],
+      "landmarks": landmarks,
       "caixa": face["caixa"],
       "atributos": face["atributos"],
-      "imagem": face["imagem"], # Retornando apenas a FACE, não a imagem inteira
+      "imagem": imagem, # Retornando apenas a FACE, não a imagem inteira
     }
     if self.transform:
       sample = self.transform(sample)
