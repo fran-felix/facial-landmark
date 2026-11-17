@@ -5,7 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as pat
 import torch
-from model import para_tensor, ModeloTeste, TAMANHO, nme
+from model import para_tensor, ModeloTeste, TAMANHO, nme, PASSO, LADO_MAPA, heatmap
+
 
 face_dataset = DatasetAnotacoesFaces("train")
 
@@ -94,5 +95,40 @@ def test4():
   plt.tight_layout()
   plt.show()
 
+def test5():
+  dataset_treino = DatasetAnotacoesFaces("train")
+  amostra = dataset_treino[1]
+  recorte = amostra["imagem"]
+  pts = amostra["landmarks"]
+  mapas = np.stack([heatmap(p) for p in pts])  # (98, 64, 64): um mapa por landmark
+  # extent: posiciona o mapa 64x64 sobre o recorte 256x256 (cada célula cobre 4x4 pixels)
+  extent = (-PASSO / 2, TAMANHO - PASSO / 2, TAMANHO - PASSO / 2, -PASSO / 2)
 
-test4()
+  fig, axs = plt.subplots(1, 4, figsize=(17, 4.6))
+  axs[0].imshow(recorte)
+  axs[0].scatter(*pts[60], s=40, c="red")
+  axs[0].set_title("(a) recorte, landmark 60")
+  axs[1].imshow(mapas[60], cmap="hot")
+  axs[1].set_title("(b) heatmap do 60 (64x64, σ = 2)")
+  axs[2].imshow(recorte)
+  axs[2].imshow(mapas.max(0), cmap="hot", alpha=0.6, extent=extent)
+  axs[2].set_title("(c) máximo dos 98 heatmaps")
+
+  axs[3].imshow(recorte)
+  centros = np.arange(LADO_MAPA) * PASSO  # posição de cada célula do mapa, em pixels do recorte
+  for i, cor in [(62, "red"), (66, "deepskyblue")]:
+    axs[3].contour(centros, centros, mapas[i], levels=[0.25, 0.5, 0.75], colors=cor, linewidths=1.2)
+    axs[3].scatter(*pts[i], s=40, c=cor, edgecolors="white", zorder=3)
+  axs[3].scatter(*pts[[60, 61, 63, 64, 65, 67]].T, s=12, c="yellow", zorder=3)
+  axs[3].set_xticks(np.arange(-PASSO / 2, TAMANHO, PASSO), minor=True)
+  axs[3].set_yticks(np.arange(-PASSO / 2, TAMANHO, PASSO), minor=True)
+  axs[3].grid(which="minor", color="white", lw=0.4, alpha=0.5)
+  #aproximar(axs[3], pts[60:68], margem=0.25)
+  distancia = np.linalg.norm(pts[62] - pts[66])
+  axs[3].set_title(f"(d) mapas do 62 e do 66 (grade = células)\n"
+                  f"distância {distancia:.1f} px = {distancia / PASSO:.1f} células")
+  for ax in axs:
+    ax.tick_params(labelbottom=False, labelleft=False, length=0)
+  plt.show()
+
+test5()
