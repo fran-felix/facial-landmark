@@ -19,6 +19,9 @@ else:
   N_TREINO, EPOCAS, LOTE, LR, PASSOS_SANIDADE = 400, 4, 16, 1e-3, 40
 N_VAL = 300
 
+PASSO = 4                       # pixels do recorte por célula do mapa
+LADO_MAPA = TAMANHO // PASSO    # 64
+
 # Definindo o backbone do modelo
 pesos_imagenet = torchvision.models.ResNet18_Weights.DEFAULT
 
@@ -54,7 +57,7 @@ class CabecaFaceNet(nn.Module):
     self.conv3 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1)
     self.bn3 = nn.BatchNorm2d(64)
 
-    self.last_conv = nn.Conv2d(98, 98, 1)
+    self.last_conv = nn.Conv2d(64, 98, 1)
     self.relu = nn.ReLU(inplace=True)
 
   def forward(self, x):
@@ -63,7 +66,7 @@ class CabecaFaceNet(nn.Module):
     x = self.relu(self.bn3(self.conv3(x)))
     x = self.last_conv(x)
 
-    return x
+    return x # Retorna os 98 heatmaps previstos
 
 
 class FaceNet(nn.Module):
@@ -73,6 +76,25 @@ class FaceNet(nn.Module):
     resnet = torchvision.models.resnet18(weights=pesos_imagenet)
     self.backbone = nn.Sequential(*list(resnet.children())[:-2])
     self.cabeca = CabecaFaceNet()
+
+  def forward(self, x):
+    return self.soft_argmax_2d(self.cabeca(self.backbone(x))) # Retorna as coodernadas previstas para cada ponto
+
+  # Gerado por IA v
+  def soft_argmax_2d(self, logits):
+    # logits: [batch, pontos, altura, largura]
+    batch, pontos, altura, largura = logits.shape
+
+    probabilidades = torch.softmax(logits.flatten(start_dim=2), dim=2).view(batch, pontos, altura, largura)
+
+    xs = torch.linspace(0, 1, largura, device=logits.device, dtype=logits.dtype).view(1, 1, 1, largura)
+
+    ys = torch.linspace(0, 1, altura, device=logits.device, dtype=logits.dtype).view(1, 1, altura, 1)
+
+    coordenada_x = (probabilidades * xs).sum(dim=(2, 3))
+    coordenada_y = (probabilidades * ys).sum(dim=(2, 3))
+
+    return torch.stack((coordenada_x, coordenada_y), dim=-1)
 
 def contar(parametros):
   return sum(p.numel() for p in parametros)
@@ -113,14 +135,18 @@ def ear_medio(pts):
     return (ear(pts, "direito") + ear(pts, "esquerdo")) / 2
 
 # ----- Heatmaps -----
-PASSO = 4                       # pixels do recorte por célula do mapa
-LADO_MAPA = TAMANHO // PASSO    # 64
-
 def heatmap(ponto, sigma=2.0):
   """Gaussiana LADO_MAPA x LADO_MAPA centrada no ponto (dado em pixels do recorte)."""
   x, y = np.asarray(ponto) / PASSO            # posição em células do mapa
   ys, xs = np.mgrid[0:LADO_MAPA, 0:LADO_MAPA]
   return np.exp(-((xs - x) ** 2 + (ys - y) ** 2) / (2 * sigma ** 2))
+
+def soft_argmax_2d(logits):
+  p = np.exp(logits - logits.max())
+  p /= p.sum()                                     # softmax espacial: soma 1
+  ys, xs = np.mgrid[0:LADO_MAPA, 0:LADO_MAPA]
+  return np.array([(xs * p).sum(), (ys * p).sum()]) * PASSO  # valor esperado
+
 
 # ----- Predição X Ground Truth -----
 def avaliar(modelo, loader, tamanho):
@@ -195,12 +221,18 @@ def treinar(modelo, max_epocas, batch_size, lr, tamanho, completo=True):
     print(f"época {epoca:2d} | perda {np.mean(perdas):.4f} | NME validação {100 * nme_val:5.2f}% |"
           f"tempo: {time.time() - inicio:.0f} s")
 
-modelo = ModeloTeste()
-for p in modelo.backbone.parameters(): p.requires_grad = False
-print(f"backbone:   {contar(modelo.backbone.parameters()):>10,} parâmetros (pré-treinados, ImageNet)")
-print(f"cabeça:     {contar(modelo.cabeca.parameters()):>10,} parâmetros (aleatórios, treinados no WFLW)")
-print(f"treináveis: {contar(p for p in modelo.parameters() if p.requires_grad):>10,}")
+# modelo = ModeloTeste()
+
+face_model = FaceNet()
+for p in face_model.backbone.parameters(): p.requires_grad = False
+print(f"backbone:   {contar(face_model.backbone.parameters()):>10,} parâmetros (pré-treinados, ImageNet)")
+print(f"cabeça:     {contar(face_model.cabeca.parameters()):>10,} parâmetros (aleatórios, treinados no WFLW)")
+print(f"treináveis: {contar(p for p in face_model.parameters() if p.requires_grad):>10,}")
+
+#print(face_model)
 
 #treinar(modelo, EPOCAS, LOTE, LR, TAMANHO, completo=False)
+#treinar(face_model, EPOCAS, LOTE, LR, TAMANHO, completo=False)
 
 #torch.save(modelo.cabeca.state_dict(), "/home/francisco/trabalho_final_TPI/weights/cabeca.pt")
+#torch.save(face_model.cabeca.state_dict(), "/home/francisco/trabalho_final_TPI/weights/face_cabeca.pt")

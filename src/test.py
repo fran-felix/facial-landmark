@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as pat
 import torch
-from model import para_tensor, ModeloTeste, TAMANHO, nme, PASSO, LADO_MAPA, heatmap
+from model import para_tensor, FaceNet, TAMANHO, nme, PASSO, LADO_MAPA, heatmap
 
 
 face_dataset = DatasetAnotacoesFaces("train")
@@ -65,16 +65,15 @@ def test2():
 
   test3(exemplo, M, pts_recorte)
 
-def test4():
+# Visualizando uma previsão do modelo e comparando com os landmarks corretos
+def test4(modelo):
   dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-  modelo = ModeloTeste()
   
-  modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/cabeca.pt", weights_only=True))
   modelo.to(dispositivo)
   modelo.eval()
 
   dataset_treino = DatasetAnotacoesFaces("train")
-  amostra = dataset_treino[1]
+  amostra = dataset_treino[19]
 
   # O modelo recebe um lote (N, 3, 256, 256), não apenas uma imagem (256, 256, 3).
   # As coordenadas previstas estão normalizadas; multiplicamos por 256 para compará-las
@@ -131,4 +130,6 @@ def test5():
     ax.tick_params(labelbottom=False, labelleft=False, length=0)
   plt.show()
 
-test5()
+modelo = FaceNet()
+modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/face_cabeca.pt", weights_only=True))
+test4(modelo=modelo)
