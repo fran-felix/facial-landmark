@@ -1,11 +1,13 @@
-from dataset import DatasetAnotacoesFaces, ANNOTATIONS, IMAGES, REGIOES, CORES
+from dataset import DatasetAnotacoesFaces, REGIOES, CORES
 
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as pat
+import torch
+from model import para_tensor, ModeloTeste, TAMANHO, nme
 
-face_dataset = DatasetAnotacoesFaces(ANNOTATIONS, IMAGES)
+face_dataset = DatasetAnotacoesFaces("train")
 
 def desenhar_caixa(ax, caixa, cor, **kwargs):
   x0, y0, x1, y1 = caixa
@@ -62,6 +64,35 @@ def test2():
 
   test3(exemplo, M, pts_recorte)
 
+def test4():
+  dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  modelo = ModeloTeste()
+  
+  modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/cabeca.pt", weights_only=True))
+  modelo.to(dispositivo)
+  modelo.eval()
 
-test1()
-test2()
+  dataset_treino = DatasetAnotacoesFaces("train")
+  amostra = dataset_treino[1]
+
+  # O modelo recebe um lote (N, 3, 256, 256), não apenas uma imagem (256, 256, 3).
+  # As coordenadas previstas estão normalizadas; multiplicamos por 256 para compará-las
+  # com os landmarks anotados, que já estão em pixels do recorte.
+  imagem = amostra["imagem"]
+  entrada = para_tensor(np.expand_dims(imagem, axis=0))
+  with torch.no_grad():
+    pred = modelo(entrada).cpu().numpy()[0] * TAMANHO
+    gt = amostra["landmarks"]
+
+  fig, ax = plt.subplots(figsize=(6, 6))
+  ax.imshow(imagem)
+  ax.scatter(*gt.T, s=12, c="lime", label="verdade")
+  ax.scatter(*pred.T, s=12, c="red", marker="x", label="previsto")
+  ax.set_title(f"Landmarks - NME: {100 * nme(pred, gt):.2f}%")
+  ax.legend(loc="lower right")
+  ax.axis("off")
+  plt.tight_layout()
+  plt.show()
+
+
+test4()
