@@ -12,6 +12,7 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Rectangle
 
 ATTRIBUTES = ["pose", "expressão", "iluminação", "maquiagem", "oclusão", "desfoque"]
 EYES = list(range(60, 76))  # 60–67: olho direito, 68–75: olho esquerdo
@@ -34,7 +35,10 @@ def load_annotations(data_dir: Path, split: str) -> list[dict]:
 
 
 def draw(ax, sample: dict, margin: float = 0.3) -> None:
-    image = cv2.cvtColor(cv2.imread(str(sample["image"])), cv2.COLOR_BGR2RGB)
+    loaded = cv2.imread(str(sample["image"]))
+    if loaded is None:
+        raise FileNotFoundError(f"Não foi possível carregar a imagem: {sample['image']}")
+    image = cv2.cvtColor(loaded, cv2.COLOR_BGR2RGB)
     x0, y0, x1, y1 = sample["bbox"]
     pts = sample["landmarks"]
 
@@ -50,8 +54,8 @@ def draw(ax, sample: dict, margin: float = 0.3) -> None:
     ax.scatter(*pts[others].T, s=6, c="lime")
     ax.scatter(*pts[EYES].T, s=8, c="red")
     ax.scatter(*pts[PUPILS].T, s=12, c="yellow", marker="x")
-    ax.add_patch(plt.Rectangle((x0 - cx0, y0 - cy0), x1 - x0, y1 - y0,
-                               fill=False, edgecolor="cyan", linewidth=1))
+    ax.add_patch(Rectangle((x0 - cx0, y0 - cy0), x1 - x0, y1 - y0,
+                           fill=False, edgecolor="cyan", linewidth=1))
 
     active = [a for a, v in zip(ATTRIBUTES, sample["attributes"]) if v]
     ax.set_title(", ".join(active) or "normal", fontsize=8)
@@ -59,7 +63,8 @@ def draw(ax, sample: dict, margin: float = 0.3) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    description = __doc__.splitlines()[0] if __doc__ else None
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--data", type=Path, default=Path("data"))
     parser.add_argument("--split", choices=["train", "test"], default="train")
     parser.add_argument("--n", type=int, default=8, help="número de faces")
