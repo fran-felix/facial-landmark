@@ -10,6 +10,8 @@ DATA = Path("/home/francisco/trabalho_final_TPI/data")
 ANNOTATIONS = DATA / "WFLW_annotations/list_98pt_rect_attr_train_test"
 IMAGES = DATA / "WFLW_images"
 
+TAMANHO = 256
+
 REGIOES = {
 "contorno": range(0, 33), "sobrancelhas": range(33, 51), "nariz": range(51, 60),
 "olho direito": range(60, 68), "olho esquerdo": range(68, 76),
@@ -29,18 +31,15 @@ class Face(TypedDict):
   imagem: Path
 
 class DatasetAnotacoesFaces(Dataset):
-  def __init__(self, annotations=ANNOTATIONS, img_dir=IMAGES, transform=None):
+  def __init__(self, split, annotations=ANNOTATIONS, img_dir=IMAGES, transform=None):
     self.annotations = Path(annotations)
     self.img_dir = Path(img_dir)
     self.transform = transform
-    self.tamanho_recorte = 256
+    self.tamanho_recorte = TAMANHO
 
-    # self.faces_treino = [] # [0, 7499] train
-    # self.faces_teste = [] # [7500, 9999] test
-    # self.faces_treino = self.ler_anotacoes("train")
-    # self.faces_teste = self.ler_anotacoes("test")
-
-    self.faces: list[Face] = (self.ler_anotacoes("train") + self.ler_anotacoes("test"))
+    # [0, 7499] train [7500, 9999] test
+    # self.faces: list[Face] = (self.ler_anotacoes("train") + self.ler_anotacoes("test"))
+    self.faces: list[Face] = self.ler_anotacoes(split)
 
   def ler_anotacoes(self, split: str) -> list[Face]:
     arquivo = self.annotations / f"list_98pt_rect_attr_{split}.txt"
