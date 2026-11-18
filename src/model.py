@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 import numpy as np
-from dataset import DatasetAnotacoesFaces, TAMANHO
+from dataset import DatasetAnotacoesFaces, TAMANHO, rng
 import time
 import matplotlib.pyplot as plt
 
@@ -174,7 +174,7 @@ def treinar(modelo, max_epocas, batch_size, lr, tamanho, completo=True):
 
   dataset_treino = DatasetAnotacoesFaces("train")
   dataset_val = DatasetAnotacoesFaces("test")
-  ordem = np.random.default_rng(0)
+  ordem = rng
 
   if completo:
     dataset_treino.faces = [dataset_treino.faces[i] for i in ordem.permutation(len(dataset_val))]
@@ -222,7 +222,7 @@ def treinar(modelo, max_epocas, batch_size, lr, tamanho, completo=True):
           f"tempo: {time.time() - inicio:.0f} s")
 
 # modelo = ModeloTeste()
-
+"""
 face_model = FaceNet()
 for p in face_model.backbone.parameters(): p.requires_grad = False
 print(f"backbone:   {contar(face_model.backbone.parameters()):>10,} parâmetros (pré-treinados, ImageNet)")
@@ -231,8 +231,8 @@ print(f"treináveis: {contar(p for p in face_model.parameters() if p.requires_gr
 
 #print(face_model)
 
-#treinar(modelo, EPOCAS, LOTE, LR, TAMANHO, completo=False)
 #treinar(face_model, EPOCAS, LOTE, LR, TAMANHO, completo=False)
 
 #torch.save(modelo.cabeca.state_dict(), "/home/francisco/trabalho_final_TPI/weights/cabeca.pt")
-#torch.save(face_model.cabeca.state_dict(), "/home/francisco/trabalho_final_TPI/weights/face_cabeca.pt")
+#torch.save(face_model.cabeca.state_dict(), "/home/francisco/trabalho_final_TPI/weights/modelo.pt")
+"""
