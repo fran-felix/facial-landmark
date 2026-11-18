@@ -1,4 +1,4 @@
-from dataset import DatasetAnotacoesFaces, REGIOES, CORES
+from dataset import DatasetAnotacoesFaces, REGIOES, CORES, rng
 
 import cv2
 import numpy as np
@@ -21,6 +21,11 @@ def desenhar_landmarks(ax, pts, s=10, legenda=False):
       ax.scatter(*pts[list(indices)].T, s=s, c=CORES[nome], label=nome)
   if legenda:
       ax.legend(fontsize=8, loc="lower right", markerscale=1.5)
+
+def buscar(faces, nome_arquivo):
+    """Maior face anotada na imagem com esse nome de arquivo."""
+    candidatas = [f for f in faces if f["imagem"].name == nome_arquivo]
+    return max(candidatas, key=lambda f: f["caixa"][2] - f["caixa"][0])
 
 # Testando o __getitem__ implementado
 def test1():
@@ -130,6 +135,25 @@ def test5():
     ax.tick_params(labelbottom=False, labelleft=False, length=0)
   plt.show()
 
-modelo = FaceNet()
-modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/face_cabeca.pt", weights_only=True))
-test4(modelo=modelo)
+# Visualização da Data Augmentation do dataset
+def test6(dataset: DatasetAnotacoesFaces, path):
+  
+  fig, axs = plt.subplots(2, 4, figsize=(14, 7.2))
+  for ax in axs.flat:
+    sample = dataset[500]
+    img = sample["imagem"]
+    pts = sample["landmarks"]
+    ax.imshow(img)
+    desenhar_landmarks(ax, pts, s=4)
+    ax.axis("off")
+  fig.suptitle("Recortes aumentados: os pontos acompanham a imagem em todos eles", y=0.98)
+  plt.show()
+
+
+#modelo = FaceNet()
+#modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/face_cabeca.pt", weights_only=True))
+#modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/modelo.pt", weights_only=True))
+#test4(modelo=modelo)
+
+dataset = DatasetAnotacoesFaces()
+test6(dataset, "41_Swimming_Swimmer_41_701.jpg")
