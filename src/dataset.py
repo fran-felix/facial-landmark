@@ -33,10 +33,12 @@ class Face(TypedDict):
   imagem: Path
 
 class DatasetAnotacoesFaces(Dataset):
-  def __init__(self, split="train", annotations=ANNOTATIONS, img_dir=IMAGES):
+  def __init__(self, split="train", annotations=ANNOTATIONS, img_dir=IMAGES, transform=True):
+    """transform: default 'True', applies data augmentation on images. Set to 'False' to get unmodified images through __getitem__"""
     self.annotations = Path(annotations)
     self.img_dir = Path(img_dir)
     self.tamanho_recorte = TAMANHO
+    self.transform = True
 
     # [0, 7499] train [7500, 9999] test
     # self.faces: list[Face] = (self.ler_anotacoes("train") + self.ler_anotacoes("test"))
@@ -116,10 +118,11 @@ class DatasetAnotacoesFaces(Dataset):
     face = self.faces[int(idx)]
 
     # Augmentation
-    params = {"angulo": rng.uniform(-15, 15), "escala": rng.uniform(0.85, 1.2), "deslocamento": rng.uniform(-0.06, 0.06, size=2)}
-    M = self.matriz_aumentada(face["caixa"], **params)
-    
-    imagem, landmarks = self.recortar(face, M)
+    m = None
+    if self.transform:
+      params = {"angulo": rng.uniform(-15, 15), "escala": rng.uniform(0.85, 1.2), "deslocamento": rng.uniform(-0.06, 0.06, size=2)}
+      m = self.matriz_aumentada(face["caixa"], **params)
+    imagem, landmarks = self.recortar(face, m)
 
     sample = {
       "landmarks": landmarks,
