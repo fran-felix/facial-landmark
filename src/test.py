@@ -5,54 +5,53 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as pat
 import torch
-from model import para_tensor, FaceNet, TAMANHO, nme, PASSO, LADO_MAPA, heatmap
+from torch.utils.data import DataLoader
+from model import para_tensor, FaceNet, TAMANHO, nme, PASSO, LADO_MAPA, heatmap, avaliar
 
-
-face_dataset = DatasetAnotacoesFaces("train")
 
 def desenhar_caixa(ax, caixa, cor, **kwargs):
   x0, y0, x1, y1 = caixa
   ax.add_patch(pat.Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, ec=cor, **kwargs))
 
 def desenhar_landmarks(ax, pts, s=10, legenda=False):
-
   """Desenha os 98 pontos, com uma cor por região."""
+
   for nome, indices in REGIOES.items():
-      ax.scatter(*pts[list(indices)].T, s=s, c=CORES[nome], label=nome)
+    ax.scatter(*pts[list(indices)].T, s=s, c=CORES[nome], label=nome)
   if legenda:
-      ax.legend(fontsize=8, loc="lower right", markerscale=1.5)
+    ax.legend(fontsize=8, loc="lower right", markerscale=1.5)
 
 def buscar(faces, nome_arquivo):
-    """Maior face anotada na imagem com esse nome de arquivo."""
-    candidatas = [f for f in faces if f["imagem"].name == nome_arquivo]
-    return max(candidatas, key=lambda f: f["caixa"][2] - f["caixa"][0])
+  """Maior face anotada na imagem com esse nome de arquivo."""
+  candidatas = [f for f in faces if f["imagem"].name == nome_arquivo]
+  return max(candidatas, key=lambda f: f["caixa"][2] - f["caixa"][0])
 
-# Testando o __getitem__ implementado
-def test1():
+def test1(dataset):
+  """Testando o __getitem__ implementado"""
 
-  print(len(face_dataset))
+  print(len(dataset))
   for i in range(5):
-    sample = face_dataset[i]
+    sample = dataset[i]
     print(i, sample['landmarks'].shape, sample['caixa'].shape, sample['atributos'].shape, sample['imagem'].shape)
 
 # Inversão. Nota para o futuro
-def test3(exemplo, M, pts_recorte):
+def test3(dataset, exemplo, M, pts_recorte):
   M_inversa = cv2.invertAffineTransform(M)
-  de_volta = face_dataset.transformar_pontos(pts_recorte, M_inversa)
+  de_volta = dataset.transformar_pontos(pts_recorte, M_inversa)
   print(f"erro máximo na ida e volta: {np.abs(de_volta - exemplo['landmarks']).max():.6f} pixels")
 
-# Testando se as funções de recorte e manipulação (adaptadas) funcionam na estrutura de dados montada
-def test2():
+def test2(dataset):
+  """Testando se as funções de recorte e manipulação (adaptadas) funcionam na estrutura de dados montada"""
 
-  exemplo = next(f for f in face_dataset.faces if np.allclose(f["caixa"], [692, 90, 854, 326]))
-  M = face_dataset.matriz_recorte(exemplo["caixa"])
-  recorte, pts_recorte = face_dataset.recortar(exemplo, M)
+  exemplo = next(f for f in dataset.faces if np.allclose(f["caixa"], [692, 90, 854, 326]))
+  M = dataset.matriz_recorte(exemplo["caixa"])
+  recorte, pts_recorte = dataset.recortar(exemplo, M)
 
   print("matriz M:\n", M.round(3))
   print("landmark 60 na imagem original:", exemplo["landmarks"][60].round(1))
   print("landmark 60 no recorte:        ", pts_recorte[60].round(1))
 
-  imagem = face_dataset.ler_imagem_rgb(exemplo["imagem"])
+  imagem = dataset.ler_imagem_rgb(exemplo["imagem"])
   x0, y0, x1, y1 = exemplo["caixa"]
   c = np.array([(x0 + x1) / 2, (y0 + y1) / 2])
   lado = 1.25 * max(x1 - x0, y1 - y0)
@@ -68,17 +67,15 @@ def test2():
   axs[1].set_title("(b) recorte 256x256\nlandmarks transformados com a mesma M")
   plt.show()
 
-  test3(exemplo, M, pts_recorte)
+  test3(dataset, exemplo, M, pts_recorte)
 
-# Visualizando uma previsão do modelo e comparando com os landmarks corretos
-def test4(modelo):
+def test4(modelo, dataset):
+  """Visualizando uma previsão do modelo e comparando com os landmarks corretos"""
   dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   
   modelo.to(dispositivo)
   modelo.eval()
-
-  dataset_treino = DatasetAnotacoesFaces("train")
-  amostra = dataset_treino[19]
+  amostra = dataset[1]
 
   # O modelo recebe um lote (N, 3, 256, 256), não apenas uma imagem (256, 256, 3).
   # As coordenadas previstas estão normalizadas; multiplicamos por 256 para compará-las
@@ -135,8 +132,8 @@ def test5():
     ax.tick_params(labelbottom=False, labelleft=False, length=0)
   plt.show()
 
-# Visualização da Data Augmentation do dataset
 def test6(dataset: DatasetAnotacoesFaces, path):
+  """Visualização da Data Augmentation do dataset"""
   
   fig, axs = plt.subplots(2, 4, figsize=(14, 7.2))
   for ax in axs.flat:
@@ -149,11 +146,28 @@ def test6(dataset: DatasetAnotacoesFaces, path):
   fig.suptitle("Recortes aumentados: os pontos acompanham a imagem em todos eles", y=0.98)
   plt.show()
 
+def test7(modelo, batch_size, tamanho):
+  dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  modelo.to(dispositivo)
+  modelo.eval()
+  
+  loader = DataLoader(
+      dataset=DatasetAnotacoesFaces(split="test", transform=False),
+      batch_size=batch_size,
+    )
 
-#modelo = FaceNet()
+  print(f"NME médio para o teste: {100*avaliar(modelo, loader, tamanho):5.2f}%")
+
+
+
+modelo = FaceNet()
 #modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/face_cabeca.pt", weights_only=True))
-#modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/modelo.pt", weights_only=True))
-#test4(modelo=modelo)
+modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/modelo.pt", weights_only=True))
+dataset_val = DatasetAnotacoesFaces(split="test", transform=False)
 
-dataset = DatasetAnotacoesFaces()
-test6(dataset, "41_Swimming_Swimmer_41_701.jpg")
+#test4(modelo, dataset_val)
+
+#dataset6 = DatasetAnotacoesFaces()
+#test6(dataset6, "41_Swimming_Swimmer_41_701.jpg")
+
+test7(modelo, 32, TAMANHO)
