@@ -24,6 +24,8 @@ CORES = {
 "pupilas": "orange",
 }
 
+rng = np.random.default_rng(0)
+
 class Face(TypedDict):
   landmarks: np.ndarray
   caixa: np.ndarray
@@ -31,10 +33,9 @@ class Face(TypedDict):
   imagem: Path
 
 class DatasetAnotacoesFaces(Dataset):
-  def __init__(self, split, annotations=ANNOTATIONS, img_dir=IMAGES, transform=None):
+  def __init__(self, split="train", annotations=ANNOTATIONS, img_dir=IMAGES):
     self.annotations = Path(annotations)
     self.img_dir = Path(img_dir)
-    self.transform = transform
     self.tamanho_recorte = TAMANHO
 
     # [0, 7499] train [7500, 9999] test
@@ -94,6 +95,18 @@ class DatasetAnotacoesFaces(Dataset):
 
     return recorte, self.transformar_pontos(face["landmarks"], M)
 
+  def para_3x3(self, M):
+    return np.vstack([M, [0, 0, 1]])
+
+  def matriz_aumentada(self, caixa, angulo=0.0, escala=1.0, deslocamento=(0.0, 0.0)):
+    """
+    Recorte + rotação (graus) + escala + deslocamento (fração do recorte) em uma só matriz.
+    escala > 1 aumenta o lado do recorte (afasta a face); escala < 1 aproxima.
+    """
+    R = cv2.getRotationMatrix2D((TAMANHO / 2, TAMANHO / 2), angulo, 1 / escala)
+    R[:, 2] += np.array(deslocamento) * TAMANHO
+    return (self.para_3x3(R) @ self.para_3x3(self.matriz_recorte(caixa)))[:2].astype(np.float32)
+
   def __getitem__(self, idx):
     if torch.is_tensor(idx):
       idx = idx.item()
@@ -101,7 +114,12 @@ class DatasetAnotacoesFaces(Dataset):
       raise RuntimeError(f"Index inválido, não foi possível acessar a posição: {idx}")
 
     face = self.faces[int(idx)]
-    imagem, landmarks = self.recortar(face)
+
+    # Augmentation
+    params = {"angulo": rng.uniform(-15, 15), "escala": rng.uniform(0.85, 1.2), "deslocamento": rng.uniform(-0.06, 0.06, size=2)}
+    M = self.matriz_aumentada(face["caixa"], **params)
+    
+    imagem, landmarks = self.recortar(face, M)
 
     sample = {
       "landmarks": landmarks,
@@ -109,7 +127,5 @@ class DatasetAnotacoesFaces(Dataset):
       "atributos": face["atributos"],
       "imagem": imagem, # Retornando apenas a FACE, não a imagem inteira
     }
-    if self.transform:
-      sample = self.transform(sample)
     
     return sample
