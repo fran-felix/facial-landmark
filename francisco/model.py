@@ -77,7 +77,7 @@ class FaceNet(nn.Module):
   def forward(self, x):
     return self.soft_argmax_2d(self.cabeca(self.backbone(x))) # Retorna as coodernadas previstas para cada ponto
 
-  # Gerado por IA v
+  # Gerado por IA a partir do softargmax fornecido no colab
   def soft_argmax_2d(self, logits):
     # logits: [batch, pontos, altura, largura]
     batch, pontos, altura, largura = logits.shape

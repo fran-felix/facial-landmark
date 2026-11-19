@@ -147,15 +147,15 @@ def treinar(modelo, max_epocas, batch_size, lr, tamanho, completo=True):
     print(f"época {epoca:2d} | perda {np.mean(perdas):.4f} | NME validação {100 * nme_val:5.2f}% |"
           f"tempo: {time.time() - inicio:.0f} s")
 
-# modelo = ModeloTeste()
-
+"""
 face_model = FaceNet()
 for p in face_model.backbone.parameters(): p.requires_grad = False
 print(f"backbone:   {contar(face_model.backbone.parameters()):>10,} parâmetros (pré-treinados, ImageNet)")
 print(f"cabeça:     {contar(face_model.cabeca.parameters()):>10,} parâmetros (aleatórios, treinados no WFLW)")
 print(f"treináveis: {contar(p for p in face_model.parameters() if p.requires_grad):>10,}")
 
-#treinar(face_model, EPOCAS, LOTE, LR, TAMANHO)
+treinar(face_model, EPOCAS, LOTE, LR, TAMANHO)
 
 # Salvar pesos se desejar
 #torch.save(face_model.cabeca.state_dict(), "francisco/pesos/modelo.pt")
+"""

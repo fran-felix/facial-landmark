@@ -27,6 +27,7 @@ def buscar(faces, nome_arquivo):
   candidatas = [f for f in faces if f["imagem"].name == nome_arquivo]
   return max(candidatas, key=lambda f: f["caixa"][2] - f["caixa"][0])
 
+
 def test1(dataset):
   """Testando o __getitem__ implementado"""
 
@@ -35,11 +36,12 @@ def test1(dataset):
     sample = dataset[i]
     print(i, sample['landmarks'].shape, sample['caixa'].shape, sample['atributos'].shape, sample['imagem'].shape)
 
-# Inversão. Nota para o futuro
+
 def test3(dataset, exemplo, M, pts_recorte):
   M_inversa = cv2.invertAffineTransform(M)
   de_volta = dataset.transformar_pontos(pts_recorte, M_inversa)
   print(f"erro máximo na ida e volta: {np.abs(de_volta - exemplo['landmarks']).max():.6f} pixels")
+
 
 def test2(dataset):
   """Testando se as funções de recorte e manipulação (adaptadas) funcionam na estrutura de dados montada"""
@@ -70,6 +72,7 @@ def test2(dataset):
 
   test3(dataset, exemplo, M, pts_recorte)
 
+
 def test4(modelo, dataset):
   """Visualizando previsões do modelo e comparando com os landmarks corretos"""
 
@@ -96,6 +99,7 @@ def test4(modelo, dataset):
   fig.suptitle("Previsões para rostos.")
   plt.tight_layout()
   plt.show()
+
 
 def test5():
   dataset_treino = DatasetAnotacoesFaces("train")
@@ -133,6 +137,7 @@ def test5():
     ax.tick_params(labelbottom=False, labelleft=False, length=0)
   plt.show()
 
+
 def test6(dataset: DatasetAnotacoesFaces, path):
   """Visualização da Data Augmentation do dataset"""
   
@@ -146,6 +151,7 @@ def test6(dataset: DatasetAnotacoesFaces, path):
     ax.axis("off")
   fig.suptitle("Recortes aumentados: os pontos acompanham a imagem em todos eles", y=0.98)
   plt.show()
+
 
 def test7(modelo, batch_size, tamanho):
   """Validação fora do loop de treinamento"""
