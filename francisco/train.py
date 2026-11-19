@@ -1,11 +1,10 @@
-import torchvision
 import torch
-from torch import nn
-from torch.utils.data import DataLoader, Subset
 import numpy as np
-from dataset import DatasetAnotacoesFaces, TAMANHO, rng
 import time
-import matplotlib.pyplot as plt
+
+from torch.utils.data import DataLoader, Subset
+from dataset import DatasetAnotacoesFaces, TAMANHO, rng
+from model import FaceNet
 
 MEDIA = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)   # normalização da ImageNet
 DESVIO = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
@@ -22,79 +21,6 @@ N_VAL = 300
 PASSO = 4                       # pixels do recorte por célula do mapa
 LADO_MAPA = TAMANHO // PASSO    # 64
 
-# Definindo o backbone do modelo
-pesos_imagenet = torchvision.models.ResNet18_Weights.DEFAULT
-
-
-class ModeloTeste(nn.Module):
-  """
-  Exemplo mínimo: ResNet-18 + pooling global + uma camada linear -> 98 pontos.
-  É a opção mais simples e a menos precisa. Serve só para entender o treino.
-  """
-
-  def __init__(self):
-    super().__init__()
-    resnet = torchvision.models.resnet18(weights=pesos_imagenet)
-    self.backbone = nn.Sequential(*list(resnet.children())[:-2])
-    self.cabeca = nn.Sequential(nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(512, 98 * 2))
-
-  def forward(self, x):
-    # (B, 3, 256, 256) -> (B, 98, 2), coordenadas em fração do recorte
-    return self.cabeca(self.backbone(x)).view(-1, 98, 2)
-
-
-class CabecaFaceNet(nn.Module):
-
-  def __init__(self):
-    super().__init__()
-    # 8x8x512 -> 16x16x256
-    self.conv1 = nn.ConvTranspose2d(512, 256, kernel_size=3, stride=2, padding=1)
-    self.bn1 = nn.BatchNorm2d(256)
-    # 16x16x256 -> 32x32x128
-    self.conv2 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1)
-    self.bn2 = nn.BatchNorm2d(128)
-    # 32x32x128 -> 64x64x64
-    self.conv3 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1)
-    self.bn3 = nn.BatchNorm2d(64)
-
-    self.last_conv = nn.Conv2d(64, 98, 1)
-    self.relu = nn.ReLU(inplace=True)
-
-  def forward(self, x):
-    x = self.relu(self.bn1(self.conv1(x)))
-    x = self.relu(self.bn2(self.conv2(x)))
-    x = self.relu(self.bn3(self.conv3(x)))
-    x = self.last_conv(x)
-
-    return x # Retorna os 98 heatmaps previstos
-
-
-class FaceNet(nn.Module):
-
-  def __init__(self):
-    super().__init__()
-    resnet = torchvision.models.resnet18(weights=pesos_imagenet)
-    self.backbone = nn.Sequential(*list(resnet.children())[:-2])
-    self.cabeca = CabecaFaceNet()
-
-  def forward(self, x):
-    return self.soft_argmax_2d(self.cabeca(self.backbone(x))) # Retorna as coodernadas previstas para cada ponto
-
-  # Gerado por IA v
-  def soft_argmax_2d(self, logits):
-    # logits: [batch, pontos, altura, largura]
-    batch, pontos, altura, largura = logits.shape
-
-    probabilidades = torch.softmax(logits.flatten(start_dim=2), dim=2).view(batch, pontos, altura, largura)
-
-    xs = torch.linspace(0, 1, largura, device=logits.device, dtype=logits.dtype).view(1, 1, 1, largura)
-
-    ys = torch.linspace(0, 1, altura, device=logits.device, dtype=logits.dtype).view(1, 1, altura, 1)
-
-    coordenada_x = (probabilidades * xs).sum(dim=(2, 3))
-    coordenada_y = (probabilidades * ys).sum(dim=(2, 3))
-
-    return torch.stack((coordenada_x, coordenada_y), dim=-1)
 
 def contar(parametros):
   return sum(p.numel() for p in parametros)
@@ -222,17 +148,14 @@ def treinar(modelo, max_epocas, batch_size, lr, tamanho, completo=True):
           f"tempo: {time.time() - inicio:.0f} s")
 
 # modelo = ModeloTeste()
-"""
+
 face_model = FaceNet()
 for p in face_model.backbone.parameters(): p.requires_grad = False
 print(f"backbone:   {contar(face_model.backbone.parameters()):>10,} parâmetros (pré-treinados, ImageNet)")
 print(f"cabeça:     {contar(face_model.cabeca.parameters()):>10,} parâmetros (aleatórios, treinados no WFLW)")
 print(f"treináveis: {contar(p for p in face_model.parameters() if p.requires_grad):>10,}")
 
-#print(face_model)
+#treinar(face_model, EPOCAS, LOTE, LR, TAMANHO)
 
-#treinar(face_model, EPOCAS, LOTE, LR, TAMANHO, completo=False)
-
-#torch.save(modelo.cabeca.state_dict(), "/home/francisco/trabalho_final_TPI/weights/cabeca.pt")
-#torch.save(face_model.cabeca.state_dict(), "/home/francisco/trabalho_final_TPI/weights/modelo.pt")
-"""
+# Salvar pesos se desejar
+#torch.save(face_model.cabeca.state_dict(), "francisco/pesos/modelo.pt")

@@ -1,12 +1,12 @@
 import cv2
 import torch
+import numpy as np
+
 from torch.utils.data import Dataset
 from pathlib import Path
-import numpy as np
 from typing import TypedDict
 
-
-DATA = Path("/home/francisco/trabalho_final_TPI/data")
+DATA = Path("data")
 ANNOTATIONS = DATA / "WFLW_annotations/list_98pt_rect_attr_train_test"
 IMAGES = DATA / "WFLW_images"
 

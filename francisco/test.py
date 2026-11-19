@@ -1,12 +1,13 @@
-from dataset import DatasetAnotacoesFaces, REGIOES, CORES, rng
-
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as pat
 import torch
+
 from torch.utils.data import DataLoader
-from model import para_tensor, FaceNet, TAMANHO, nme, PASSO, LADO_MAPA, heatmap, avaliar
+from dataset import DatasetAnotacoesFaces, TAMANHO, REGIOES, CORES, rng
+from train import para_tensor, TAMANHO, nme, PASSO, LADO_MAPA, heatmap, avaliar
+from model import FaceNet
 
 
 def desenhar_caixa(ax, caixa, cor, **kwargs):
@@ -70,29 +71,29 @@ def test2(dataset):
   test3(dataset, exemplo, M, pts_recorte)
 
 def test4(modelo, dataset):
-  """Visualizando uma previsão do modelo e comparando com os landmarks corretos"""
+  """Visualizando previsões do modelo e comparando com os landmarks corretos"""
+
   dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   
   modelo.to(dispositivo)
   modelo.eval()
-  amostra = dataset[1]
 
-  # O modelo recebe um lote (N, 3, 256, 256), não apenas uma imagem (256, 256, 3).
-  # As coordenadas previstas estão normalizadas; multiplicamos por 256 para compará-las
-  # com os landmarks anotados, que já estão em pixels do recorte.
-  imagem = amostra["imagem"]
-  entrada = para_tensor(np.expand_dims(imagem, axis=0))
-  with torch.no_grad():
-    pred = modelo(entrada).cpu().numpy()[0] * TAMANHO
-    gt = amostra["landmarks"]
+  fig, axs = plt.subplots(3, 4, figsize=(14, 7.2))
+  for ax, sample in zip(axs.flat, dataset):
+    img = sample["imagem"]
+    entrada = para_tensor(np.expand_dims(img, axis=0))
 
-  fig, ax = plt.subplots(figsize=(6, 6))
-  ax.imshow(imagem)
-  ax.scatter(*gt.T, s=12, c="lime", label="verdade")
-  ax.scatter(*pred.T, s=12, c="red", marker="x", label="previsto")
-  ax.set_title(f"Landmarks - NME: {100 * nme(pred, gt):.2f}%")
-  ax.legend(loc="lower right")
-  ax.axis("off")
+    with torch.no_grad():
+      pred = modelo(entrada).cpu().numpy()[0] * TAMANHO
+      gt = sample["landmarks"]
+
+    ax.imshow(img)
+    ax.scatter(*gt.T, s=12, c="lime", label="verdade")
+    ax.scatter(*pred.T, s=12, c="red", marker="x", label="previsto")
+    ax.set_title(f"Landmarks - NME: {100 * nme(pred, gt):.2f}%")
+    ax.legend(loc="lower right")
+    ax.axis("off")
+  fig.suptitle("Previsões para rostos.")
   plt.tight_layout()
   plt.show()
 
@@ -147,6 +148,8 @@ def test6(dataset: DatasetAnotacoesFaces, path):
   plt.show()
 
 def test7(modelo, batch_size, tamanho):
+  """Validação fora do loop de treinamento"""
+
   dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   modelo.to(dispositivo)
   modelo.eval()
@@ -161,11 +164,10 @@ def test7(modelo, batch_size, tamanho):
 
 
 modelo = FaceNet()
-#modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/face_cabeca.pt", weights_only=True))
-modelo.cabeca.load_state_dict(torch.load("/home/francisco/trabalho_final_TPI/weights/modelo.pt", weights_only=True))
+modelo.cabeca.load_state_dict(torch.load("francisco/pesos/modelo.pt", weights_only=True))
 dataset_val = DatasetAnotacoesFaces(split="test", transform=False)
 
-#test4(modelo, dataset_val)
+test4(modelo, dataset_val)
 
 #dataset6 = DatasetAnotacoesFaces()
 #test6(dataset6, "41_Swimming_Swimmer_41_701.jpg")
