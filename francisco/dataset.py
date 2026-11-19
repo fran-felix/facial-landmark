@@ -9,6 +9,7 @@ from typing import TypedDict
 DATA = Path("data")
 ANNOTATIONS = DATA / "WFLW_annotations/list_98pt_rect_attr_train_test"
 IMAGES = DATA / "WFLW_images"
+ESPELHO = DATA / "WFLW_annotations" / "Mirror98.txt"
 
 TAMANHO = 256
 
@@ -38,7 +39,7 @@ class DatasetAnotacoesFaces(Dataset):
     self.annotations = Path(annotations)
     self.img_dir = Path(img_dir)
     self.tamanho_recorte = TAMANHO
-    self.transform = True
+    self.transform = transform
 
     # [0, 7499] train [7500, 9999] test
     # self.faces: list[Face] = (self.ler_anotacoes("train") + self.ler_anotacoes("test"))
@@ -109,6 +110,16 @@ class DatasetAnotacoesFaces(Dataset):
     R[:, 2] += np.array(deslocamento) * TAMANHO
     return (self.para_3x3(R) @ self.para_3x3(self.matriz_recorte(caixa)))[:2].astype(np.float32)
 
+  def espelhar(self, recorte, pts):
+    espelho = np.array(ESPELHO.read_text().strip().split(","), dtype=int)
+
+    recorte_esp = recorte[:, ::-1]                 # espelha a imagem (inverte as colunas)
+    pts_esp = pts.copy()
+    pts_esp[:, 0] = TAMANHO - 1 - pts[:, 0]        # espelha só a coordenada x
+    pts_certo = pts_esp[espelho]                   # ... e troca cada ponto pelo seu par
+
+    return recorte_esp, pts_certo
+
   def __getitem__(self, idx):
     if torch.is_tensor(idx):
       idx = idx.item()
@@ -123,6 +134,9 @@ class DatasetAnotacoesFaces(Dataset):
       params = {"angulo": rng.uniform(-15, 15), "escala": rng.uniform(0.85, 1.2), "deslocamento": rng.uniform(-0.06, 0.06, size=2)}
       m = self.matriz_aumentada(face["caixa"], **params)
     imagem, landmarks = self.recortar(face, m)
+
+    if self.transform and rng.random() < 0.5:
+      imagem, landmarks = self.espelhar(imagem, landmarks)
 
     sample = {
       "landmarks": landmarks,
