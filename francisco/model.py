@@ -34,10 +34,10 @@ class CabecaFaceNet(nn.Module):
     self.conv2 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1)
     self.bn2 = nn.BatchNorm2d(128)
     # 32x32x128 -> 64x64x64
-    self.conv3 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1)
-    self.bn3 = nn.BatchNorm2d(64)
+    self.conv3 = nn.ConvTranspose2d(128, 98, kernel_size=3, stride=2, padding=1)
+    self.bn3 = nn.BatchNorm2d(98)
 
-    self.last_conv = nn.Conv2d(64, 98, 1)
+    self.last_conv = nn.Conv2d(98, 98, 1)
     self.relu = nn.ReLU(inplace=True)
     self.apply(self._inicializar_pesos)
 
