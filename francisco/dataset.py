@@ -113,7 +113,8 @@ class DatasetAnotacoesFaces(Dataset):
   def espelhar(self, recorte, pts):
     espelho = np.array(ESPELHO.read_text().strip().split(","), dtype=int)
 
-    recorte_esp = recorte[:, ::-1]                 # espelha a imagem (inverte as colunas)
+    # A inversão cria um array com stride negativo; o PyTorch não aceita isso.
+    recorte_esp = recorte[:, ::-1].copy()          # espelha e cria memória contígua
     pts_esp = pts.copy()
     pts_esp[:, 0] = TAMANHO - 1 - pts[:, 0]        # espelha só a coordenada x
     pts_certo = pts_esp[espelho]                   # ... e troca cada ponto pelo seu par
